@@ -267,6 +267,77 @@ def register_commands(app):
         else:
             print(f'Failed to update exchange rates: {error}')
 
+    @app.cli.command('seed-permissions')
+    def seed_permissions():
+        """Ensure all roles and permissions exist."""
+        from app.models.role import Role, PermissionEntity, PermissionAction, Permission
+        
+        print('Ensuring system roles exist...')
+        Role.ensure_system_roles()
+        
+        roles = Role.query.all()
+        entities = PermissionEntity.ALL_ENTITIES
+        actions = PermissionAction.ALL_ACTIONS
+        
+        print(f'Syncing permissions for {len(entities)} entities and {len(actions)} actions...')
+        
+        permissions_created = 0
+        for role in roles:
+            for entity in entities:
+                for action in actions:
+                    # Check if permission exists for this role/entity/action
+                    perm = Permission.query.filter_by(
+                        role_id=role.id,
+                        entity=entity,
+                        action=action
+                    ).first()
+                    
+                    if not perm:
+                        # Determine default enabled status based on role type
+                        is_enabled = False
+                        conditions = None
+                        
+                        if role.type == Role.TYPE_SUPERADMIN:
+                            is_enabled = True
+                        elif role.type == Role.TYPE_ADMIN:
+                            # Admin has everything except role/permission management
+                            if entity not in [PermissionEntity.ROLE, PermissionEntity.PERMISSION]:
+                                is_enabled = True
+                        elif role.type == Role.TYPE_AUTHENTICATED:
+                            # Standard user policy (matches migration 004 logic)
+                            authenticated_policy = {
+                                PermissionEntity.USER: [PermissionAction.READ, PermissionAction.UPDATE],
+                                PermissionEntity.ADDRESS: PermissionAction.ALL_ACTIONS,
+                                PermissionEntity.STORE: [PermissionAction.READ, PermissionAction.READ_ALL],
+                                PermissionEntity.ORDER: [PermissionAction.CREATE, PermissionAction.READ, PermissionAction.READ_ALL],
+                                PermissionEntity.ORDER_ITEM: [PermissionAction.READ, PermissionAction.READ_ALL],
+                                PermissionEntity.CART: PermissionAction.ALL_ACTIONS,
+                                PermissionEntity.CART_ITEM: PermissionAction.ALL_ACTIONS,
+                                PermissionEntity.PAYMENT: [PermissionAction.CREATE, PermissionAction.READ, PermissionAction.READ_ALL],
+                                PermissionEntity.EXCHANGE_RATE: [PermissionAction.READ, PermissionAction.READ_ALL],
+                                PermissionEntity.NOTIFICATION: [PermissionAction.READ, PermissionAction.READ_ALL, PermissionAction.UPDATE]
+                            }
+                            
+                            if entity in authenticated_policy:
+                                allowed_actions = authenticated_policy[entity]
+                                if action in allowed_actions:
+                                    is_enabled = True
+                                    if entity in [PermissionEntity.USER, PermissionEntity.ADDRESS, PermissionEntity.ORDER, 
+                                                PermissionEntity.ORDER_ITEM, PermissionEntity.CART, PermissionEntity.CART_ITEM, 
+                                                PermissionEntity.PAYMENT, PermissionEntity.NOTIFICATION]:
+                                        conditions = {'own_only': True}
+                        elif role.type == Role.TYPE_PUBLIC:
+                            # Public policy
+                            if entity in [PermissionEntity.STORE, PermissionEntity.EXCHANGE_RATE] and \
+                               action in [PermissionAction.READ, PermissionAction.READ_ALL]:
+                                is_enabled = True
+                        
+                        role.set_permission(entity, action, is_enabled, conditions)
+                        permissions_created += 1
+        
+        db.session.commit()
+        print(f'Permission sync complete. {permissions_created} new permissions created.')
+
     @app.cli.command('generate-encryption-key')
     def generate_encryption_key():
         """Generate a new encryption key for ENCRYPTION_KEY env var."""
@@ -286,20 +357,25 @@ def register_commands(app):
         from app.models.role import Role
         from app.models.cart import Cart
 
+        # Ensure roles and permissions exist first
+        print('Ensuring roles and permissions exist...')
+        Role.ensure_system_roles()
+        # Trigger permission seed via command-like logic (internal call)
+        seed_permissions.callback()
+
         # Get superadmin role
         superadmin_role = Role.get_superadmin_role()
         if not superadmin_role:
-            print('Error: Superadmin role not found. Run migrations first.')
+            print('Error: Superadmin role not found after seeding.')
             return
 
-        if User.email_exists(email):
-            # Check if user exists and update role
-            existing = User.get_by_email(email)
-            if existing:
-                existing.role_id = superadmin_role.id
-                db.session.commit()
-                print(f'User {email} upgraded to superadmin.')
-                return
+        user = User.get_by_email(email)
+        if user:
+            # Update role to superadmin if user exists
+            user.role_id = superadmin_role.id
+            db.session.commit()
+            print(f'User {email} updated to superadmin.')
+            return
 
         user = User(
             display_name=name,
@@ -316,8 +392,9 @@ def register_commands(app):
         db.session.flush()
 
         # Create cart
-        cart = Cart(user_id=user.id)
-        db.session.add(cart)
+        if not user.cart:
+            cart = Cart(user_id=user.id)
+            db.session.add(cart)
 
         db.session.commit()
         print(f'Superadmin user created: {email}')
@@ -376,12 +453,19 @@ def register_commands(app):
 
     @app.cli.command('seed-all')
     @click.option('--rate', type=float, default=36.50, help='Initial exchange rate USD to VES')
-    def seed_all(rate):
-        """Seed all initial data (stores + exchange rate)."""
+    @click.option('--admin-email', default='admin@duma.com', help='Default superadmin email')
+    @click.option('--admin-password', default='admin123', help='Default superadmin password')
+    def seed_all(rate, admin_email, admin_password):
+        """Seed all initial data (stores + exchange rate + permissions + superadmin)."""
         from app.models.store import Store
         from app.models.exchange_rate import ExchangeRate
 
-        # Seed stores
+        # 1. Seed permissions
+        print('Seeding roles and permissions...')
+        seed_permissions.callback()
+
+        # 2. Seed stores
+        print('Seeding stores...')
         stores = [
             {'name': 'Amazon', 'slug': 'amazon', 'base_url': 'https://www.amazon.com', 'display_order': 1},
             {'name': 'eBay', 'slug': 'ebay', 'base_url': 'https://www.ebay.com', 'display_order': 2},
@@ -398,7 +482,8 @@ def register_commands(app):
                 db.session.add(store)
                 store_count += 1
 
-        # Seed exchange rate
+        # 3. Seed exchange rate
+        print('Seeding exchange rate...')
         existing_rate = ExchangeRate.get_current_rate('USD', 'VES')
         if not existing_rate:
             new_rate = ExchangeRate(
@@ -413,6 +498,10 @@ def register_commands(app):
             print(f'Exchange rate set: 1 USD = {rate} VES')
         else:
             print(f'Exchange rate already exists: 1 USD = {existing_rate.rate} VES')
+
+        # 4. Create default superadmin
+        print(f'Ensuring superadmin {admin_email} exists...')
+        create_superadmin.callback(email=admin_email, password=admin_password, name='Super Admin')
 
         db.session.commit()
         print(f'Seeded {store_count} stores.')

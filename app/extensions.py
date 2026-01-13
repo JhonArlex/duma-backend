@@ -30,6 +30,21 @@ celery = Celery()
 
 
 # JWT Callbacks
+@jwt.additional_claims_loader
+def add_claims_to_access_token(user):
+    """Add user permissions to JWT claims."""
+    if hasattr(user, 'role') and user.role:
+        return {
+            "user_permissions": {
+                "roleId": str(user.role_id),
+                "roleName": user.role.name,
+                "roleType": user.role.type,
+                "permissions": user.role.get_permissions_dict()
+            }
+        }
+    return {"user_permissions": None}
+
+
 @jwt.user_identity_loader
 def user_identity_lookup(user):
     """Return user ID as identity."""

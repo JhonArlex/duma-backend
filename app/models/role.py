@@ -112,6 +112,75 @@ class Role(db.Model):
         """Get the public role."""
         return cls.query.filter_by(type=cls.TYPE_PUBLIC).first()
 
+    @classmethod
+    def ensure_system_roles(cls):
+        """Ensure all system roles exist in the database."""
+        from app.extensions import db
+        import uuid
+
+        system_roles = [
+            {
+                'id': uuid.UUID('00000000-0000-0000-0000-000000000001'),
+                'name': 'Super Administrador',
+                'description': 'Acceso total al sistema. Puede gestionar roles y permisos.',
+                'type': cls.TYPE_SUPERADMIN,
+                'is_system': True,
+                'is_default': False
+            },
+            {
+                'id': uuid.UUID('00000000-0000-0000-0000-000000000002'),
+                'name': 'Administrador',
+                'description': 'Acceso administrativo. No puede gestionar roles.',
+                'type': cls.TYPE_ADMIN,
+                'is_system': True,
+                'is_default': False
+            },
+            {
+                'id': uuid.UUID('00000000-0000-0000-0000-000000000003'),
+                'name': 'Usuario Autenticado',
+                'description': 'Usuario regular con acceso a sus propios datos.',
+                'type': cls.TYPE_AUTHENTICATED,
+                'is_system': True,
+                'is_default': True
+            },
+            {
+                'id': uuid.UUID('00000000-0000-0000-0000-000000000004'),
+                'name': 'Público',
+                'description': 'Acceso público sin autenticación.',
+                'type': cls.TYPE_PUBLIC,
+                'is_system': True,
+                'is_default': False
+            }
+        ]
+
+        roles_created = 0
+        for data in system_roles:
+            role = cls.query.get(data['id'])
+            if not role:
+                # Also check by name/type to avoid unique constraint violations
+                role = cls.query.filter((cls.name == data['name']) | (cls.type == data['type'])).first()
+                if not role:
+                    role = cls(
+                        id=data['id'],
+                        name=data['name'],
+                        description=data['description'],
+                        type=data['type'],
+                        is_system=data['is_system'],
+                        is_default=data['is_default']
+                    )
+                    db.session.add(role)
+                    roles_created += 1
+                else:
+                    # Sync ID and flags if exists but different ID
+                    role.id = data['id']
+                    role.is_system = data['is_system']
+                    role.is_default = data['is_default']
+
+        if roles_created > 0:
+            db.session.commit()
+        
+        return roles_created
+
     def has_permission(self, entity: str, action: str) -> bool:
         """Check if role has a specific permission."""
         # Superadmin has all permissions
