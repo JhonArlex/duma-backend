@@ -121,3 +121,14 @@ uploads/
 
 # macOS
 .DS_Store
+
+# AI Assistant
+.claude/
+CLAUDE.md
+.cursor/
+.cursorrules
+.aider*
+.gemini/
+.anthropic/
+.openai/
+.specify/
