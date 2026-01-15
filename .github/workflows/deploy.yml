@@ -109,7 +109,7 @@ jobs:
             echo "Levanando la aplicación"            
             docker compose up -d
 
-            wait 30
+            sleep 20
 
             echo "Verificando que todo esta ok"            
             docker ps -a
