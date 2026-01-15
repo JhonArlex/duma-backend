@@ -1,0 +1,117 @@
+name: Deploy DUMA backend
+
+on:
+  push:
+    branches:
+      - develop
+      - testing
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Environment dinámico según rama
+    environment: ${{ github.ref_name }}
+
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            set -e
+
+            APP_NAME="duma-backend"
+            REPO="git@github.com:${{ github.repository }}.git"
+            BRANCH="${{ github.ref_name }}"
+
+            echo "Deploy branch: $BRANCH"
+
+            # =========================
+            # Selección de entorno
+            # =========================
+            if [ "$BRANCH" = "develop" ]; then
+              BASE_DIR="/opt/duma/dev/backend"
+            elif [ "$BRANCH" = "testing" ]; then
+              BASE_DIR="/opt/duma/test/backend"
+            elif [ "$BRANCH" = "production" ]; then
+              BASE_DIR="/opt/duma/prod/backend"
+            else
+              echo "Rama no soportada"
+              exit 1
+            fi
+
+            APP_DIR="$BASE_DIR/$APP_NAME"
+
+            echo "Directorio destino: $APP_DIR"
+
+            mkdir -p "$BASE_DIR"
+            cd "$BASE_DIR"
+
+            # =========================
+            # Git clone / pull
+            # =========================
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "Repositorio existente, actualizando..."
+              cd "$APP_DIR"
+              git fetch origin
+              git checkout "$BRANCH"
+              git pull origin "$BRANCH"
+            else
+              echo "Repositorio no existe, clonando..."
+              git clone -b "$BRANCH" "$REPO" "$APP_NAME"
+              cd "$APP_NAME"
+            fi
+
+            echo "Código listo en $(pwd)"
+
+            # =========================
+            # BUILD / DEPLOY
+            # =========================
+            echo "Construccion del .env"
+
+            echo "SE DESCARGO EL CODGIO EN EL ENTORNO DE ${{ github.ref_name }}"
+
+            echo "🧩 Creando .env"
+
+            cat > .env <<EOF
+            FLASK_APP=${{ secrets.FLASK_APP }}
+            FLASK_ENV=${{ secrets.FLASK_ENV }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_ACCESS_TOKEN_EXPIRES=${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}
+            JWT_REFRESH_TOKEN_EXPIRES=${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}
+
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+            CELERY_BROKER_URL=${{ secrets.CELERY_BROKER_URL }}
+            CELERY_RESULT_BACKEND=${{ secrets.CELERY_RESULT_BACKEND }}
+
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            ENCRYPTION_SALT=${{ secrets.ENCRYPTION_SALT }}
+            EOF
+
+            chmod 600 .env
+
+            echo "Build de la aplicación"
+
+            docker compose build
+
+            echo "Levanando la aplicación"            
+            docker compose up -d
+
+            wait 30
+
+            echo "Verificando que todo esta ok"            
+            docker ps -a
+
+            echo "Deploy finalizado para $BRANCH"
