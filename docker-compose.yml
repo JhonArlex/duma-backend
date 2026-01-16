@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-api
+    container_name: duma-api-${ENV}
     restart: unless-stopped
     ports:
       - "${PORT}:5000"
@@ -25,14 +25,14 @@ services:
     volumes:
       - ./logs:/app/logs
     networks:
-      - duma-network
+      - duma-network-${ENV}
 
 
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: duma-redis
+    container_name: duma-redis-${ENV}
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -40,14 +40,14 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
     networks:
-      - duma-network
+      - duma-network-${ENV}
 
   # Celery Worker
   celery-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-celery-worker
+    container_name: duma-celery-worker-${ENV}
     restart: unless-stopped
     command: celery -A app.celery worker --loglevel=info
     environment:
@@ -61,14 +61,14 @@ services:
       redis:
         condition: service_started
     networks:
-      - duma-network
+      - duma-network-${ENV}
 
   # Celery Beat (Scheduler)
   celery-beat:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-celery-beat
+    container_name: duma-celery-beat-${ENV}
     restart: unless-stopped
     command: celery -A app.celery beat --loglevel=info
     environment:
@@ -82,12 +82,12 @@ services:
       redis:
         condition: service_started
     networks:
-      - duma-network
+      - duma-network-${ENV}
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
     image: nginx:alpine
-    container_name: duma-nginx
+    container_name: duma-nginx-${ENV}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -98,12 +98,12 @@ services:
     depends_on:
       - api
     networks:
-      - duma-network
+      - duma-network-${ENV}
     profiles:
       - production
 
 networks:
-  duma-network:
+  duma-network-${ENV}:
     driver: bridge
 
 volumes:

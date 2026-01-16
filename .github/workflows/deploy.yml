@@ -78,6 +78,7 @@ jobs:
             echo "🧩 Creando .env"
 
             cat > .env <<EOF
+            ENV=${{ vars.ENV }}
             FLASK_APP=${{ secrets.FLASK_APP }}
             FLASK_ENV=${{ secrets.FLASK_ENV }}
             SECRET_KEY=${{ secrets.SECRET_KEY }}
