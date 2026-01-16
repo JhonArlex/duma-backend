@@ -98,6 +98,8 @@ jobs:
 
             ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
             ENCRYPTION_SALT=${{ secrets.ENCRYPTION_SALT }}
+
+            PORT=${{ vars.PORT }}
             EOF
 
             chmod 600 .env
