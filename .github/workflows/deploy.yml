@@ -101,6 +101,8 @@ jobs:
             ENCRYPTION_SALT=${{ secrets.ENCRYPTION_SALT }}
 
             PORT=${{ vars.PORT }}
+            REDIS_PORT=${{vars.REDIS_PORT}}
+            
             EOF
 
             chmod 600 .env
