@@ -107,14 +107,14 @@ jobs:
 
             echo "Build de la aplicación"
 
-            docker compose build
+            sudo docker compose build
 
             echo "Levanando la aplicación"            
-            docker compose up -d
+            sudo docker compose up -d
 
             sleep 20
 
             echo "Verificando que todo esta ok"            
-            docker ps -a
+            sudo docker ps -a
 
             echo "Deploy finalizado para $BRANCH"
