@@ -132,3 +132,4 @@ CLAUDE.md
 .anthropic/
 .openai/
 .specify/
+redis_data/
