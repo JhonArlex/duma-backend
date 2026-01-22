@@ -6,7 +6,7 @@ services:
     image: duma-api:testing
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.test
     container_name: duma-api-testing
     restart: unless-stopped
     ports:
@@ -49,7 +49,7 @@ services:
     image: duma-celery-worker:testing
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.test
     container_name: duma-celery-worker-testing
     restart: unless-stopped
     command: celery -A app.celery worker --loglevel=info

@@ -49,7 +49,7 @@ services:
     image: celery-worker:produccion
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: duma-celery-worker-produccion
     restart: unless-stopped
     command: celery -A app.celery worker --loglevel=info
@@ -73,7 +73,7 @@ services:
     image: celery-beat:produccion
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: duma-celery-beat-produccion
     restart: unless-stopped
     command: celery -A app.celery beat --loglevel=info
