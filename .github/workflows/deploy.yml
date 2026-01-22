@@ -110,12 +110,12 @@ jobs:
             # =========================
             echo "🐳 Desplegando servicios"
 
-            docker compose -f "$COMPOSE_FILE" build
-            docker compose -f "$COMPOSE_FILE" up -d --build
+            sudo docker compose -f "$COMPOSE_FILE" build
+            sudo docker compose -f "$COMPOSE_FILE" up -d --build
 
             sleep 20
 
             echo "🔎 Verificando contenedores"
-            docker ps -a
+            sudo docker ps -a
 
             echo "🎉 Deploy finalizado para $BRANCH"
