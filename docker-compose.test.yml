@@ -72,7 +72,7 @@ services:
     image: duma-celery-beat:testing
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.test
     container_name: duma-celery-beat-testing
     restart: unless-stopped
     command: celery -A app.celery beat --loglevel=info
