@@ -3,10 +3,11 @@
 services:
   # Flask API Server
   api:
+    image: duma-api:testing
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-api-${ENV}
+    container_name: duma-api-testing
     restart: unless-stopped
     ports:
       - "${PORT}:5000"
@@ -25,29 +26,31 @@ services:
     volumes:
       - ./logs:/app/logs
     networks:
-      - duma-network-${ENV}
+      - duma-network-testing
+      - db_duma-dbpostgress-testing
 
 
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: duma-redis-${ENV}
+    container_name: duma-redis-testing
     restart: unless-stopped
     ports:
       - "${REDIS_PORT}:6379"
     volumes:
-      - ./redis_data:/data
+      - redis_data_testing:/data
     command: redis-server --appendonly yes
     networks:
-      - duma-network-${ENV}
+      - duma-network-testing
 
   # Celery Worker
   celery-worker:
+    image: duma-celery-worker:testing
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-celery-worker-${ENV}
+    container_name: duma-celery-worker-testing
     restart: unless-stopped
     command: celery -A app.celery worker --loglevel=info
     environment:
@@ -62,14 +65,15 @@ services:
       redis:
         condition: service_started
     networks:
-      - duma-network-${ENV}
+      - duma-network-testing
 
   # Celery Beat (Scheduler)
   celery-beat:
+    image: duma-celery-beat:testing
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: duma-celery-beat-${ENV}
+    container_name: duma-celery-beat-testing
     restart: unless-stopped
     command: celery -A app.celery beat --loglevel=info
     environment:
@@ -83,12 +87,12 @@ services:
       redis:
         condition: service_started
     networks:
-      - duma-network-${ENV}
+      - duma-network-testing
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
     image: nginx:alpine
-    container_name: duma-nginx-${ENV}
+    container_name: duma-nginx-testing
     restart: unless-stopped
     ports:
       - "80:80"
@@ -99,7 +103,7 @@ services:
     depends_on:
       - api
     networks:
-      - duma-network-${ENV}
+      - duma-network-testing
     profiles:
       - production
 
@@ -109,6 +113,8 @@ networks:
   duma-network-testing:
     driver: bridge
   duma-network-produccion:
-    driver: bridge    
-#volumes:
-#  redis_data:
+    driver: bridge
+  db_duma-dbpostgress-testing:
+    external: true    
+volumes:
+  redis_data_testing:
