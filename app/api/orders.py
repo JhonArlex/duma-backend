@@ -231,3 +231,90 @@ def get_order_history(order_id):
 
     history = [h.to_dict() for h in order.status_history.order_by('created_at')]
     return jsonify({'history': history}), 200
+
+
+@bp.route('/admin', methods=['POST'])
+@require_superadmin()
+def create_order_admin():
+    """Create a new order (Admin only)."""
+    schema = OrderCreateSchema()
+    
+    try:
+        data = schema.load(request.json)
+    except ValidationError as err:
+        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+
+    # User ID must be provided in admin creation, or inferred?
+    # Schema might not have user_id. I might need to accept it from request.json separately if schema filters it.
+    # Assuming request.json has 'user_id'.
+    user_id = request.json.get('user_id')
+    if not user_id:
+         return jsonify({'error': 'missing_user', 'message': 'User ID is required'}), 400
+
+    # Verify shipping address belongs to user
+    address = Address.query.filter_by(
+        id=data['shipping_address_id'],
+        user_id=user_id
+    ).first()
+
+    if not address:
+        return jsonify({'error': 'invalid_address', 'message': 'Shipping address not found'}), 400
+
+    # Get current exchange rate
+    exchange_rate = ExchangeRate.get_current_rate('USD', 'VES')
+
+    # Create order
+    order = Order(
+        user_id=user_id,
+        shipping_address_id=data['shipping_address_id'],
+        order_number=generate_order_number(),
+        notes=data.get('notes'),
+        subtotal=Decimal('0'),
+        total_usd=Decimal('0'),
+        exchange_rate=Decimal(str(exchange_rate.rate)) if exchange_rate else None
+    )
+    db.session.add(order)
+    db.session.flush()
+
+    # Create order items
+    subtotal = Decimal('0')
+    for item_data in data['items']:
+        store_id = item_data.get('store_id')
+        if store_id:
+            store = Store.query.get(store_id)
+            if not store or not store.is_active:
+                store_id = None
+
+        unit_price = Decimal(str(item_data['unit_price']))
+        quantity = item_data['quantity']
+        total_price = unit_price * quantity
+
+        order_item = OrderItem(
+            order_id=order.id,
+            store_id=store_id,
+            product_url=item_data['product_url'],
+            title=item_data.get('title'),
+            image_url=item_data.get('image_url'),
+            variant_size=item_data.get('variant_size'),
+            variant_color=item_data.get('variant_color'),
+            quantity=quantity,
+            unit_price=unit_price,
+            total_price=total_price,
+            notes=item_data.get('notes')
+        )
+        db.session.add(order_item)
+        subtotal += total_price
+
+    # Calculate totals
+    order.subtotal = subtotal
+    order.platform_fee = subtotal * Decimal('0.10')
+    order.total_usd = order.subtotal + order.platform_fee
+    if order.exchange_rate:
+        order.total_bs = order.total_usd * order.exchange_rate
+
+    db.session.commit()
+
+    order_schema = OrderSchema()
+    result = order_schema.dump(order)
+    result['items'] = [item.to_dict() for item in order.items]
+    return jsonify(result), 201

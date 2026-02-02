@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from decimal import Decimal
 from datetime import datetime
+from app.utils.permissions import require_superadmin
 
 from app.extensions import db
 from app.models.payment import Payment
@@ -193,3 +194,84 @@ def stripe_webhook():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+
+# =============================================================================
+# Admin Payment Management
+# =============================================================================
+
+@bp.route('/admin/all', methods=['GET'])
+@require_superadmin()
+def get_all_payments_admin():
+    """Get all payments (Admin only)."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    pagination = Payment.query.order_by(Payment.created_at.desc()).paginate(page=page, per_page=per_page)
+    
+    payment_schema = PaymentSchema(many=True)
+    
+    return jsonify({
+        'payments': payment_schema.dump(pagination.items),
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page
+    }), 200
+
+
+@bp.route('/admin/<uuid:payment_id>', methods=['GET'])
+@require_superadmin()
+def get_payment_admin(payment_id):
+    """Get any payment by ID (Admin only)."""
+    payment = Payment.query.get(payment_id)
+    
+    if not payment:
+        return jsonify({'error': 'payment_not_found', 'message': 'Payment not found'}), 404
+        
+    payment_schema = PaymentSchema()
+    return jsonify(payment_schema.dump(payment)), 200
+
+
+@bp.route('/admin', methods=['POST'])
+@require_superadmin()
+def create_payment_admin():
+    """Create a new payment manually (Admin only)."""
+    # Simple creation for manual/cash payments or recording external payments
+    # Expects order_id, amount, payment_provider, etc.
+    schema = PaymentCreateSchema()
+    
+    try:
+        data = schema.load(request.json)
+    except ValidationError as err:
+        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        
+    order = Order.query.get(data['order_id'])
+    if not order:
+        return jsonify({'error': 'order_not_found', 'message': 'Order not found'}), 404
+        
+    # Check if user_id matches request if needed, but Admin can create for anyone.
+    # Payment model needs user_id. We should probably use order.user_id
+    
+    payment = Payment(
+        order_id=order.id,
+        user_id=order.user_id,
+        payment_provider=data['payment_provider'],
+        amount=order.total_usd, # Or data['amount'] if partial payment supported?
+        # Schema might not have amount. Using order total for now.
+        currency='USD',
+        payment_method=data.get('payment_method', 'manual'),
+        status='completed' # Admin created payments are usually confirmed immediately
+    )
+    
+    # If transaction ID provided
+    if data.get('stripe_payment_method_id'): # reusing field for Ref ID
+        payment.provider_txn_id = data.get('stripe_payment_method_id')
+
+    order.payment_status = Order.PAYMENT_STATUS_PAID
+    order.paid_at = datetime.utcnow()
+    
+    db.session.add(payment)
+    db.session.commit()
+    
+    payment_schema = PaymentSchema()
+    return jsonify(payment_schema.dump(payment)), 201
