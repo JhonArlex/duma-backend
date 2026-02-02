@@ -34,6 +34,7 @@ class UserCreateSchema(Schema):
     display_name = fields.Str(required=True, validate=validate.Length(min=2, max=255))
     phone_number = fields.Str(validate=validate.Length(max=50))
     country = fields.Str(validate=validate.Length(max=100))
+    role_id = fields.UUID(missing=None)
 
     @validates('password')
     def validate_password(self, value):
@@ -56,6 +57,7 @@ class UserUpdateSchema(Schema):
     country = fields.Str(validate=validate.Length(max=100))
     default_currency = fields.Str(validate=validate.Length(max=10))
     locker_code = fields.Str(validate=validate.Length(max=50))
+    role_id = fields.UUID(allow_none=True)
 
 
 class LoginSchema(Schema):

@@ -227,7 +227,7 @@ def create_user_admin():
         display_name=data.get('display_name'),
         phone_number=data.get('phone_number'),
         country=data.get('country'),
-        role_type=User.ROLE_AUTHENTICATED # Default role
+        role_id=data.get('role_id')
     )
     user.set_password(data['password'])
     
