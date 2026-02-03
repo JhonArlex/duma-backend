@@ -8,6 +8,7 @@ from app.extensions import db
 from app.models.cart import Cart, CartItem
 from app.models.store import Store
 from app.schemas.cart import CartSchema, CartItemSchema, CartItemCreateSchema, CartItemUpdateSchema
+from app.utils.errors import error_response, validation_error_response, ErrorCode
 
 bp = Blueprint('carts', __name__, url_prefix='/carts')
 
@@ -45,7 +46,7 @@ def add_item():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     # Get store if provided
     store_id = data.get('store_id')
@@ -107,7 +108,7 @@ def update_item(item_id):
     item = CartItem.query.filter_by(id=item_id, cart_id=cart.id).first()
 
     if not item:
-        return jsonify({'error': 'item_not_found', 'message': 'Cart item not found'}), 404
+        return jsonify(error_response(ErrorCode.CART_ITEM_NOT_FOUND)), 404
 
     schema = CartItemUpdateSchema()
 
@@ -168,14 +169,11 @@ def checkout():
     items = list(cart.items)
 
     if not items:
-        return jsonify({'error': 'empty_cart', 'message': 'Cart is empty'}), 400
+        return jsonify(error_response('CART_EMPTY', message='Cart is empty')), 400
 
     shipping_address_id = request.json.get('shipping_address_id')
     if not shipping_address_id:
-        return jsonify({
-            'error': 'missing_address',
-            'message': 'Shipping address is required'
-        }), 400
+        return jsonify(error_response('SHIPPING_ADDRESS_REQUIRED', message='Shipping address is required')), 400
 
     # Prepare order data
     order_items = []
@@ -235,7 +233,7 @@ def get_cart_admin(cart_id):
     cart = Cart.query.get(cart_id)
     
     if not cart:
-        return jsonify({'error': 'cart_not_found', 'message': 'Cart not found'}), 404
+        return jsonify(error_response(ErrorCode.CART_NOT_FOUND)), 404
         
     cart_schema = CartSchema()
     return jsonify(cart_schema.dump(cart)), 200
@@ -247,7 +245,7 @@ def create_cart_admin():
     """Create a new cart for a user (Admin only)."""
     user_id = request.json.get('user_id')
     if not user_id:
-         return jsonify({'error': 'missing_user', 'message': 'User ID is required'}), 400
+         return jsonify(error_response(ErrorCode.MISSING_USER_ID)), 400
          
     # Check if cart exists
     cart = Cart.query.filter_by(user_id=user_id).first()

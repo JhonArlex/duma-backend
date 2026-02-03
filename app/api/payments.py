@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models.payment import Payment
 from app.models.order import Order
 from app.schemas.payment import PaymentSchema, PaymentCreateSchema
+from app.utils.errors import error_response, validation_error_response, ErrorCode
 
 bp = Blueprint('payments', __name__, url_prefix='/payments')
 
@@ -21,20 +22,20 @@ def create_payment_intent():
 
     order_id = request.json.get('order_id')
     if not order_id:
-        return jsonify({'error': 'missing_order', 'message': 'Order ID is required'}), 400
+        return jsonify(error_response('ORDER_ID_REQUIRED', message='Order ID is required')), 400
 
     order = Order.query.filter_by(id=order_id, user_id=user_id).first()
 
     if not order:
-        return jsonify({'error': 'order_not_found', 'message': 'Order not found'}), 404
+        return jsonify(error_response(ErrorCode.ORDER_NOT_FOUND)), 404
 
     if order.payment_status == Order.PAYMENT_STATUS_PAID:
-        return jsonify({'error': 'already_paid', 'message': 'Order is already paid'}), 400
+        return jsonify(error_response(ErrorCode.ORDER_ALREADY_PAID, message='Order is already paid')), 400
 
     # Create payment intent with Stripe
     stripe_secret = current_app.config.get('STRIPE_SECRET_KEY')
     if not stripe_secret:
-        return jsonify({'error': 'payment_not_configured', 'message': 'Payment provider not configured'}), 500
+        return jsonify(error_response('PAYMENT_NOT_CONFIGURED', message='Payment provider not configured')), 500
 
     try:
         import stripe
@@ -58,7 +59,7 @@ def create_payment_intent():
         }), 200
 
     except Exception as e:
-        return jsonify({'error': 'payment_error', 'message': str(e)}), 500
+        return jsonify(error_response(ErrorCode.STRIPE_ERROR, message=str(e))), 500
 
 
 @bp.route('/confirm', methods=['POST'])
@@ -71,7 +72,7 @@ def confirm_payment():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     order = Order.query.filter_by(id=data['order_id'], user_id=user_id).first()
 
@@ -111,7 +112,7 @@ def confirm_payment():
                 payment.mark_failed(str(e))
                 db.session.add(payment)
                 db.session.commit()
-                return jsonify({'error': 'payment_failed', 'message': str(e)}), 400
+                return jsonify(error_response('PAYMENT_FAILED', message=str(e))), 400
 
     db.session.add(payment)
     db.session.commit()
@@ -128,7 +129,7 @@ def get_payment(payment_id):
     payment = Payment.query.filter_by(id=payment_id, user_id=user_id).first()
 
     if not payment:
-        return jsonify({'error': 'payment_not_found', 'message': 'Payment not found'}), 404
+        return jsonify(error_response(ErrorCode.PAYMENT_NOT_FOUND)), 404
 
     payment_schema = PaymentSchema()
     return jsonify(payment_schema.dump(payment)), 200
@@ -158,7 +159,7 @@ def stripe_webhook():
     webhook_secret = current_app.config.get('STRIPE_WEBHOOK_SECRET')
 
     if not webhook_secret:
-        return jsonify({'error': 'webhook_not_configured'}), 500
+        return jsonify(error_response('WEBHOOK_NOT_CONFIGURED', message='Webhook not configured')), 500
 
     try:
         import stripe
@@ -193,7 +194,7 @@ def stripe_webhook():
         return jsonify({'received': True}), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify(error_response(ErrorCode.WEBHOOK_SIGNATURE_INVALID, message=str(e))), 400
 
 
 # =============================================================================
