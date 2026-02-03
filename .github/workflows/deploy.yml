@@ -1,0 +1,121 @@
+name: Deploy DUMA backend
+
+on:
+  push:
+    branches:
+      - develop
+      - testing
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment: ${{ github.ref_name }}
+
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            set -e
+
+            APP_NAME="duma-backend"
+            REPO="git@github.com:${{ github.repository }}.git"
+            BRANCH="${{ github.ref_name }}"
+
+            echo "🚀 Deploy branch: $BRANCH"
+
+            # =========================
+            # Selección de entorno
+            # =========================
+            if [ "$BRANCH" = "develop" ]; then
+              BASE_DIR="/opt/duma/dev/backend"
+              COMPOSE_FILE="docker-compose.dev.yml"
+            elif [ "$BRANCH" = "testing" ]; then
+              BASE_DIR="/opt/duma/test/backend"
+              COMPOSE_FILE="docker-compose.test.yml"
+            elif [ "$BRANCH" = "production" ]; then
+              BASE_DIR="/opt/duma/prod/backend"
+              COMPOSE_FILE="docker-compose.prod.yml"
+            else
+              echo "❌ Rama no soportada"
+              exit 1
+            fi
+
+            APP_DIR="$BASE_DIR/$APP_NAME"
+
+            echo "📁 Directorio destino: $APP_DIR"
+            echo "🐳 Compose: $COMPOSE_FILE"
+
+            mkdir -p "$BASE_DIR"
+            cd "$BASE_DIR"
+
+            # =========================
+            # Git clone / pull
+            # =========================
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "🔄 Repositorio existente, actualizando..."
+              cd "$APP_DIR"
+              git fetch origin
+              git checkout "$BRANCH"
+              git pull origin "$BRANCH"
+            else
+              echo "⬇️ Repositorio no existe, clonando..."
+              git clone -b "$BRANCH" "$REPO" "$APP_NAME"
+              cd "$APP_NAME"
+            fi
+
+            echo "✅ Código listo en $(pwd)"
+
+            # =========================
+            # Crear .env
+            # =========================
+            echo "🧩 Generando .env"
+
+            cat > .env <<EOF
+            ENV=${{ vars.ENV }}
+            FLASK_APP=${{ secrets.FLASK_APP }}
+            FLASK_ENV=${{ secrets.FLASK_ENV }}
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_ACCESS_TOKEN_EXPIRES=${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}
+            JWT_REFRESH_TOKEN_EXPIRES=${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}
+
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+            CELERY_BROKER_URL=${{ secrets.CELERY_BROKER_URL }}
+            CELERY_RESULT_BACKEND=${{ secrets.CELERY_RESULT_BACKEND }}
+
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            ENCRYPTION_SALT=${{ secrets.ENCRYPTION_SALT }}
+
+            PORT=${{ vars.PORT }}
+            REDIS_PORT=${{ vars.REDIS_PORT }}
+            EOF
+
+            chmod 600 .env
+
+            # =========================
+            # Deploy con Docker Compose
+            # =========================
+            echo "🐳 Desplegando servicios"
+
+            sudo docker compose -f "$COMPOSE_FILE" build
+            sudo docker compose -f "$COMPOSE_FILE" up -d --build
+
+            sleep 20
+
+            echo "🔎 Verificando contenedores"
+            sudo docker ps -a
+
+            echo "🎉 Deploy finalizado para $BRANCH"
