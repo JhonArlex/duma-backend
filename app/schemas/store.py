@@ -11,7 +11,16 @@ class StoreSchema(Schema):
     logo_url = fields.Str()
     is_active = fields.Bool()
     display_order = fields.Int()
-    config = fields.Dict()
+    config = fields.Method("get_config")
+
+    def get_config(self, obj):
+        if obj.config and isinstance(obj.config, str):
+            import json
+            try:
+                return json.loads(obj.config)
+            except json.JSONDecodeError:
+                return {}
+        return obj.config or {}
 
 
 class StoreCreateSchema(Schema):

@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from decimal import Decimal
+from app.utils.permissions import require_superadmin
 
 from app.extensions import db
 from app.models.cart import Cart, CartItem
@@ -202,3 +203,60 @@ def checkout():
             'item_count': cart.item_count
         }
     }), 200
+
+
+# =============================================================================
+# Admin Cart Management
+# =============================================================================
+
+@bp.route('/admin/all', methods=['GET'])
+@require_superadmin()
+def get_all_carts_admin():
+    """Get all carts (Admin only)."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    pagination = Cart.query.paginate(page=page, per_page=per_page)
+    
+    cart_schema = CartSchema(many=True)
+    
+    return jsonify({
+        'carts': cart_schema.dump(pagination.items),
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page
+    }), 200
+
+
+@bp.route('/admin/<uuid:cart_id>', methods=['GET'])
+@require_superadmin()
+def get_cart_admin(cart_id):
+    """Get any cart by ID (Admin only)."""
+    cart = Cart.query.get(cart_id)
+    
+    if not cart:
+        return jsonify({'error': 'cart_not_found', 'message': 'Cart not found'}), 404
+        
+    cart_schema = CartSchema()
+    return jsonify(cart_schema.dump(cart)), 200
+
+
+@bp.route('/admin', methods=['POST'])
+@require_superadmin()
+def create_cart_admin():
+    """Create a new cart for a user (Admin only)."""
+    user_id = request.json.get('user_id')
+    if not user_id:
+         return jsonify({'error': 'missing_user', 'message': 'User ID is required'}), 400
+         
+    # Check if cart exists
+    cart = Cart.query.filter_by(user_id=user_id).first()
+    if cart:
+        return jsonify({'message': 'Cart already exists', 'id': cart.id}), 200
+        
+    cart = Cart(user_id=user_id)
+    db.session.add(cart)
+    db.session.commit()
+    
+    cart_schema = CartSchema()
+    return jsonify(cart_schema.dump(cart)), 201

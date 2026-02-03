@@ -41,7 +41,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/amazon.com',
             'is_active': True,
             'display_order': 1,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'eBay',
@@ -50,7 +50,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/ebay.com',
             'is_active': True,
             'display_order': 2,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'Walmart',
@@ -59,7 +59,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/walmart.com',
             'is_active': True,
             'display_order': 3,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'Target',
@@ -68,7 +68,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/target.com',
             'is_active': True,
             'display_order': 4,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'Best Buy',
@@ -77,7 +77,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/bestbuy.com',
             'is_active': True,
             'display_order': 5,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'Shein',
@@ -86,7 +86,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/shein.com',
             'is_active': True,
             'display_order': 6,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": True},
         },
         {
             'name': 'AliExpress',
@@ -95,7 +95,7 @@ def upgrade():
             'logo_url': 'https://logo.clearbit.com/aliexpress.com',
             'is_active': True,
             'display_order': 7,
-            'config': '{"supported_countries": ["US", "CN"], "scraping_enabled": true}',
+            'config': {"supported_countries": ["US", "CN"], "scraping_enabled": True},
         },
         {
             'name': 'Otra Tienda',
@@ -104,7 +104,7 @@ def upgrade():
             'logo_url': None,
             'is_active': True,
             'display_order': 99,
-            'config': '{"supported_countries": ["US"], "scraping_enabled": false}',
+            'config': {"supported_countries": ["US"], "scraping_enabled": False},
         },
     ])
 
