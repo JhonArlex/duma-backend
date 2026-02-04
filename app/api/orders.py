@@ -9,6 +9,8 @@ from app.models.address import Address
 from app.models.store import Store
 from app.models.exchange_rate import ExchangeRate
 from app.schemas.order import OrderSchema, OrderCreateSchema, OrderStatusUpdateSchema
+from app.utils.errors import error_response, validation_error_response, ErrorCode
+from app.utils.permissions import require_superadmin
 
 bp = Blueprint('orders', __name__, url_prefix='/orders')
 
@@ -64,7 +66,7 @@ def get_order(order_id):
     order = Order.query.filter_by(id=order_id, user_id=user_id).first()
 
     if not order:
-        return jsonify({'error': 'order_not_found', 'message': 'Order not found'}), 404
+        return jsonify(error_response(ErrorCode.ORDER_NOT_FOUND)), 404
 
     order_schema = OrderSchema()
     result = order_schema.dump(order)
@@ -82,7 +84,7 @@ def create_order():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     # Verify shipping address belongs to user
     address = Address.query.filter_by(
@@ -91,7 +93,7 @@ def create_order():
     ).first()
 
     if not address:
-        return jsonify({'error': 'invalid_address', 'message': 'Shipping address not found'}), 400
+        return jsonify(error_response(ErrorCode.INVALID_ADDRESS, message='Shipping address not found')), 400
 
     # Get current exchange rate
     exchange_rate = ExchangeRate.get_current_rate('USD', 'VES')
@@ -184,10 +186,10 @@ def update_order_status(order_id):
     }
 
     if new_status not in valid_transitions.get(order.status, []):
-        return jsonify({
-            'error': 'invalid_transition',
-            'message': f'Cannot transition from {order.status} to {new_status}'
-        }), 400
+        return jsonify(error_response(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=f'Cannot transition from {order.status} to {new_status}'
+        )), 400
 
     order.update_status(new_status, changed_by=user_id, notes=data.get('notes'))
     db.session.commit()
@@ -207,10 +209,10 @@ def cancel_order(order_id):
         return jsonify({'error': 'order_not_found', 'message': 'Order not found'}), 404
 
     if order.status not in [Order.STATUS_PENDING, Order.STATUS_PROCESSING]:
-        return jsonify({
-            'error': 'cannot_cancel',
-            'message': 'Order cannot be cancelled in its current status'
-        }), 400
+        return jsonify(error_response(
+            ErrorCode.ORDER_CANNOT_BE_CANCELLED,
+            message='Order cannot be cancelled in its current status'
+        )), 400
 
     order.update_status(Order.STATUS_CANCELLED, changed_by=user_id, notes='Cancelled by user')
     db.session.commit()
@@ -249,7 +251,7 @@ def create_order_admin():
     # Assuming request.json has 'user_id'.
     user_id = request.json.get('user_id')
     if not user_id:
-         return jsonify({'error': 'missing_user', 'message': 'User ID is required'}), 400
+         return jsonify(error_response(ErrorCode.MISSING_USER_ID, message='User ID is required')), 400
 
     # Verify shipping address belongs to user
     address = Address.query.filter_by(

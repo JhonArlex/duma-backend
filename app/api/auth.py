@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.role import Role
 from app.models.cart import Cart
 from app.schemas.user import UserSchema, UserCreateSchema, LoginSchema, OAuthLoginSchema
+from app.utils.errors import error_response, validation_error_response, ErrorCode
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -26,11 +27,11 @@ def register():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     # Check if email already exists using hash lookup
     if User.email_exists(data['email']):
-        return jsonify({'error': 'email_exists', 'message': 'Email already registered'}), 409
+        return jsonify(error_response(ErrorCode.EMAIL_ALREADY_EXISTS)), 409
 
     # Get default role for new users
     default_role = Role.get_default_role()
@@ -77,13 +78,13 @@ def login():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     # Find user by email using hash lookup
     user = User.get_by_email(data['email'])
 
     if not user or not user.check_password(data['password']):
-        return jsonify({'error': 'invalid_credentials', 'message': 'Invalid email or password'}), 401
+        return jsonify(error_response(ErrorCode.INVALID_CREDENTIALS)), 401
 
     # Update last login
     user.update_last_login()
@@ -110,14 +111,14 @@ def oauth_login():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     provider = data['provider']
     # In a real implementation, you would verify the token with the provider
     # For now, we'll trust the token and use provided email/name
 
     if not data.get('email'):
-        return jsonify({'error': 'missing_email', 'message': 'Email is required for OAuth login'}), 400
+        return jsonify(error_response(ErrorCode.OAUTH_EMAIL_REQUIRED)), 400
 
     # Check if user exists with this OAuth provider
     user = User.query.filter_by(
@@ -129,10 +130,10 @@ def oauth_login():
         # Check if email already exists with different provider
         existing_user = User.get_by_email(data['email'])
         if existing_user:
-            return jsonify({
-                'error': 'email_exists',
-                'message': f'Email already registered with {existing_user.auth_provider}'
-            }), 409
+            return jsonify(error_response(
+                ErrorCode.EMAIL_EXISTS_WITH_DIFFERENT_PROVIDER,
+                message=f'Email already registered with {existing_user.auth_provider}'
+            )), 409
 
         # Get default role for new users
         default_role = Role.get_default_role()
@@ -179,8 +180,11 @@ def refresh():
     identity = get_jwt_identity()
     user = User.query.get(identity)
 
-    if not user or not user.is_active:
-        return jsonify({'error': 'invalid_user', 'message': 'User not found or inactive'}), 401
+    if not user:
+        return jsonify(error_response(ErrorCode.USER_NOT_FOUND)), 404
+    
+    if not user.is_active:
+        return jsonify(error_response(ErrorCode.USER_INACTIVE)), 401
 
     access_token = create_access_token(identity=user)
     return jsonify({'access_token': access_token}), 200
@@ -194,7 +198,7 @@ def get_current_user():
     user = User.query.get(identity)
 
     if not user:
-        return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
+        return jsonify(error_response(ErrorCode.USER_NOT_FOUND)), 404
 
     user_schema = UserSchema()
     return jsonify(user_schema.dump(user)), 200

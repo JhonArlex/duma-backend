@@ -17,7 +17,11 @@ class RoleSchema(Schema):
     user_count = fields.Integer(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
-    permissions = fields.Dict(dump_only=True)
+    permissions = fields.Method('get_permissions', dump_only=True)
+    
+    def get_permissions(self, obj):
+        """Get permissions as a dictionary."""
+        return obj.get_permissions_dict()
 
 
 class RoleCreateSchema(Schema):

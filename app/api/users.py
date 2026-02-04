@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.address import Address
 from app.schemas.user import UserSchema, UserUpdateSchema, PasswordChangeSchema, UserCreateSchema
 from app.schemas.address import AddressSchema, AddressCreateSchema, AddressUpdateSchema
+from app.utils.errors import error_response, validation_error_response, ErrorCode
 
 bp = Blueprint('users', __name__, url_prefix='/users')
 
@@ -20,7 +21,21 @@ def get_profile():
     user = User.query.get(user_id)
 
     if not user:
-        return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
+        return jsonify(error_response(ErrorCode.USER_NOT_FOUND)), 404
+
+    user_schema = UserSchema()
+    return jsonify(user_schema.dump(user)), 200
+
+
+@bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_me():
+    """Get current user profile (alias for /profile)."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify(error_response(ErrorCode.USER_NOT_FOUND)), 404
 
     user_schema = UserSchema()
     return jsonify(user_schema.dump(user)), 200
@@ -41,7 +56,7 @@ def update_profile():
     try:
         data = schema.load(request.json)
     except ValidationError as err:
-        return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+        return jsonify(validation_error_response(err.messages)), 400
 
     # Update user fields
     for key, value in data.items():
@@ -65,10 +80,7 @@ def change_password():
         return jsonify({'error': 'user_not_found', 'message': 'User not found'}), 404
 
     if user.auth_provider != 'email':
-        return jsonify({
-            'error': 'oauth_user',
-            'message': 'Cannot change password for OAuth users'
-        }), 400
+        return jsonify(error_response(ErrorCode.OAUTH_PASSWORD_CHANGE_NOT_ALLOWED)), 400
 
     schema = PasswordChangeSchema()
 
@@ -78,7 +90,7 @@ def change_password():
         return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
 
     if not user.check_password(data['current_password']):
-        return jsonify({'error': 'invalid_password', 'message': 'Current password is incorrect'}), 400
+        return jsonify(error_response(ErrorCode.INVALID_PASSWORD)), 400
 
     user.set_password(data['new_password'])
     db.session.commit()
@@ -130,7 +142,7 @@ def get_address(address_id):
     address = Address.query.filter_by(id=address_id, user_id=user_id).first()
 
     if not address:
-        return jsonify({'error': 'address_not_found', 'message': 'Address not found'}), 404
+        return jsonify(error_response(ErrorCode.ADDRESS_NOT_FOUND)), 404
 
     address_schema = AddressSchema()
     return jsonify(address_schema.dump(address)), 200
@@ -220,7 +232,7 @@ def create_user_admin():
         
     # Check if email exists
     if User.query.filter_by(email=data['email']).first():
-         return jsonify({'error': 'email_exists', 'message': 'Email already registered'}), 400
+         return jsonify(error_response(ErrorCode.EMAIL_ALREADY_EXISTS)), 409
          
     user = User(
         email=data['email'],
@@ -290,7 +302,7 @@ def delete_user_admin(user_id):
     # Prevent deleting self
     current_user_id = get_jwt_identity()
     if str(user.id) == str(current_user_id):
-         return jsonify({'error': 'self_delete', 'message': 'Cannot delete your own account'}), 400
+         return jsonify(error_response(ErrorCode.SELF_DELETE_NOT_ALLOWED)), 400
 
     db.session.delete(user)
     db.session.commit()
