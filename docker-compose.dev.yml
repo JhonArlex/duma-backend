@@ -73,7 +73,7 @@ services:
       - .:/app
     container_name: duma-celery-beat-develop
     restart: unless-stopped
-    command: celery -A app.celery beat --loglevel=info
+    command: celery -A app.celery beat --loglevel=info --schedule /tmp/celerybeat-schedule
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - DATABASE_URL=${DATABASE_URL}
