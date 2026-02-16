@@ -26,7 +26,6 @@ services:
     volumes:
       - ./logs:/app/logs
       - .:/app
-      - duma-network-develop
 
 
 
