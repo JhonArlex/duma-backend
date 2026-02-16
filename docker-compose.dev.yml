@@ -25,9 +25,6 @@ services:
         condition: service_started
     volumes:
       - ./logs:/app/logs
-    networks:
-      - duma-network-develop
-      - db_duma-dbpostgress-develop
 
 
 
