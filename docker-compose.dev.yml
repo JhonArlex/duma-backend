@@ -28,6 +28,7 @@ services:
       - .:/app
     networks:
       - duma-network-develop
+      - db_duma-dbpostgress-develop
 
 
 
@@ -68,6 +69,7 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
+      - db_duma-dbpostgress-develop
 
   # Celery Beat (Scheduler)
   celery-beat:
@@ -79,7 +81,7 @@ services:
       - .:/app
     container_name: duma-celery-beat-develop
     restart: unless-stopped
-    command: celery -A app.celery beat --loglevel=info
+    command: celery -A app.celery beat --loglevel=info --schedule /tmp/celerybeat-schedule
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - DATABASE_URL=${DATABASE_URL}
@@ -92,6 +94,7 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
+      - db_duma-dbpostgress-develop
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
@@ -110,13 +113,15 @@ services:
       - duma-network-develop
     profiles:
       - production
-
 networks:
   duma-network-develop:
     driver: bridge
   duma-network-testing:
     driver: bridge
   duma-network-produccion:
-    driver: bridge    
+    driver: bridge
+  db_duma-dbpostgress-develop:
+    external: true
+
 volumes:
   redis_data_develop:
