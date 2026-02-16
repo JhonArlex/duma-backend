@@ -26,7 +26,6 @@ services:
     volumes:
       - ./logs:/app/logs
       - .:/app
-    networks:
       - duma-network-develop
 
 
@@ -41,8 +40,6 @@ services:
     volumes:
       - redis_data_develop:/data
     command: redis-server --appendonly yes
-    networks:
-      - duma-network-develop
 
   # Celery Worker
   celery-worker:
@@ -66,8 +63,6 @@ services:
     depends_on:
       redis:
         condition: service_started
-    networks:
-      - duma-network-develop
 
   # Celery Beat (Scheduler)
   celery-beat:
@@ -90,8 +85,6 @@ services:
     depends_on:
       redis:
         condition: service_started
-    networks:
-      - duma-network-develop
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
@@ -106,17 +99,7 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - api
-    networks:
-      - duma-network-develop
     profiles:
       - production
-
-networks:
-  duma-network-develop:
-    driver: bridge
-  duma-network-testing:
-    driver: bridge
-  duma-network-produccion:
-    driver: bridge    
 volumes:
   redis_data_develop:
