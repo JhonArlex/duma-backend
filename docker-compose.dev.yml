@@ -25,9 +25,9 @@ services:
         condition: service_started
     volumes:
       - ./logs:/app/logs
+      - .:/app
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
 
 
@@ -50,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
     container_name: duma-celery-worker-develop
     restart: unless-stopped
     command: celery -A app.celery worker --loglevel=info
@@ -66,7 +68,6 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
   # Celery Beat (Scheduler)
   celery-beat:
@@ -74,6 +75,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
     container_name: duma-celery-beat-develop
     restart: unless-stopped
     command: celery -A app.celery beat --loglevel=info
@@ -89,7 +92,6 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
@@ -116,7 +118,5 @@ networks:
     driver: bridge
   duma-network-produccion:
     driver: bridge    
-  db_duma-dbpostgress-develop:
-    external: true
 volumes:
   redis_data_develop:

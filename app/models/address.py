@@ -52,7 +52,7 @@ class Address(db.Model):
     # Constraint for type values
     __table_args__ = (
         db.CheckConstraint(
-            type.in_(['usa_locker', 'vzla_home', 'other']),
+            type.in_(['usa_locker', 'vzla_home', 'other', 'shipping']),
             name='check_address_type'
         ),
     )

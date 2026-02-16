@@ -24,10 +24,10 @@ class OrderItemSchema(Schema):
 class OrderItemCreateSchema(Schema):
     """Schema for creating an order item."""
 
-    store_id = fields.UUID()
+    store_id = fields.UUID(allow_none=True)
     product_url = fields.Str(required=True, validate=validate.URL())
-    title = fields.Str(validate=validate.Length(max=500))
-    image_url = fields.Str()
+    title = fields.Str(validate=validate.Length(max=500), allow_none=True)
+    image_url = fields.Str(allow_none=True)
     variant_size = fields.Str(validate=validate.Length(max=100))
     variant_color = fields.Str(validate=validate.Length(max=100))
     quantity = fields.Int(required=True, validate=validate.Range(min=1))

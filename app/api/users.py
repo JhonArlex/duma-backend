@@ -100,6 +100,7 @@ def change_password():
 
 # Address endpoints (Self)
 @bp.route('/addresses', methods=['GET'])
+@bp.route('/me/addresses', methods=['GET'])
 @jwt_required()
 def get_addresses():
     """Get all addresses for current user."""
@@ -111,6 +112,7 @@ def get_addresses():
 
 
 @bp.route('/addresses', methods=['POST'])
+@bp.route('/me/addresses', methods=['POST'])
 @jwt_required()
 def create_address():
     """Create a new address."""
@@ -121,6 +123,27 @@ def create_address():
         data = schema.load(request.json)
     except ValidationError as err:
         return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
+
+    # Handle aliases and extra fields
+    if 'phone' in data:
+        if 'phone_number' not in data:
+            data['phone_number'] = data.pop('phone')
+        else:
+            data.pop('phone')
+
+    # Check for phone_number and update user if present
+    if 'phone_number' in data:
+        phone_number = data.pop('phone_number')
+        user = User.query.get(user_id)
+        if user:
+            user.phone_number = phone_number
+
+    # Handle recipient_name (map to label if label is missing)
+    if 'recipient_name' in data:
+        if 'label' not in data:
+             data['label'] = data.pop('recipient_name')
+        else:
+             data.pop('recipient_name')
 
     # If this is the default address, unset other defaults
     if data.get('is_default'):
@@ -135,6 +158,7 @@ def create_address():
 
 
 @bp.route('/addresses/<uuid:address_id>', methods=['GET'])
+@bp.route('/me/addresses/<uuid:address_id>', methods=['GET'])
 @jwt_required()
 def get_address(address_id):
     """Get a specific address."""
@@ -149,6 +173,7 @@ def get_address(address_id):
 
 
 @bp.route('/addresses/<uuid:address_id>', methods=['PUT'])
+@bp.route('/me/addresses/<uuid:address_id>', methods=['PUT'])
 @jwt_required()
 def update_address(address_id):
     """Update an address."""
@@ -165,6 +190,27 @@ def update_address(address_id):
     except ValidationError as err:
         return jsonify({'error': 'validation_error', 'messages': err.messages}), 400
 
+    # Handle aliases and extra fields
+    if 'phone' in data:
+        if 'phone_number' not in data:
+            data['phone_number'] = data.pop('phone')
+        else:
+            data.pop('phone')
+
+    # Check for phone_number and update user if present
+    if 'phone_number' in data:
+        phone_number = data.pop('phone_number')
+        user = User.query.get(user_id)
+        if user:
+            user.phone_number = phone_number
+
+    # Handle recipient_name (map to label if label is missing)
+    if 'recipient_name' in data:
+        if 'label' not in data:
+             data['label'] = data.pop('recipient_name')
+        else:
+             data.pop('recipient_name')
+
     # If setting as default, unset other defaults
     if data.get('is_default'):
         Address.query.filter_by(user_id=user_id, is_default=True).update({'is_default': False})
@@ -180,6 +226,7 @@ def update_address(address_id):
 
 
 @bp.route('/addresses/<uuid:address_id>', methods=['DELETE'])
+@bp.route('/me/addresses/<uuid:address_id>', methods=['DELETE'])
 @jwt_required()
 def delete_address(address_id):
     """Delete an address."""
@@ -196,6 +243,7 @@ def delete_address(address_id):
 
 
 @bp.route('/addresses/<uuid:address_id>/default', methods=['PUT'])
+@bp.route('/me/addresses/<uuid:address_id>/default', methods=['PUT'])
 @jwt_required()
 def set_default_address(address_id):
     """Set an address as default."""
