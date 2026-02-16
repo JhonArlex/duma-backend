@@ -10,7 +10,7 @@ from app.models.store import Store
 from app.models.exchange_rate import ExchangeRate
 from app.schemas.order import OrderSchema, OrderCreateSchema, OrderStatusUpdateSchema
 from app.utils.errors import error_response, validation_error_response, ErrorCode
-from app.utils.permissions import require_superadmin
+from app.utils.permissions import require_superadmin, require_admin
 
 bp = Blueprint('orders', __name__, url_prefix='/orders')
 
@@ -320,3 +320,118 @@ def create_order_admin():
     result = order_schema.dump(order)
     result['items'] = [item.to_dict() for item in order.items]
     return jsonify(result), 201
+
+
+# ============================================================================
+# Admin Endpoints
+# ============================================================================
+
+@bp.route('/admin/all', methods=['GET'])
+@require_admin()
+def get_all_orders_admin():
+    """Get all orders (Admin only)."""
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    per_page = min(per_page, 50)  # Max 50 per page
+
+    # Status filter
+    status = request.args.get('status')
+
+    # Build query - no user_id filter for admins
+    query = Order.query
+
+    if status:
+        query = query.filter_by(status=status)
+
+    query = query.order_by(Order.created_at.desc())
+    pagination = query.paginate(page=page, per_page=per_page)
+
+    # Serialize orders with user information
+    order_schema = OrderSchema(many=True)
+    orders_data = order_schema.dump(pagination.items)
+    
+    # Add user email to each order
+    for i, order in enumerate(pagination.items):
+        if order.user:
+            orders_data[i]['user_email'] = order.user.email
+            orders_data[i]['user_display_name'] = order.user.display_name
+
+    return jsonify({
+        'orders': orders_data,
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current_page': page
+    }), 200
+
+
+@bp.route('/admin/<uuid:order_id>', methods=['GET'])
+@require_admin()
+def get_order_admin(order_id):
+    """Get a specific order (Admin only)."""
+    # No user_id filter - admins can see any order
+    order = Order.query.get(order_id)
+
+    if not order:
+        return jsonify(error_response(ErrorCode.ORDER_NOT_FOUND)), 404
+
+    order_schema = OrderSchema()
+    result = order_schema.dump(order)
+    result['items'] = [item.to_dict() for item in order.items]
+    
+    # Add user information
+    if order.user:
+        result['user'] = {
+            'id': str(order.user.id),
+            'email': order.user.email,
+            'display_name': order.user.display_name,
+            'phone_number': order.user.phone_number
+        }
+    
+    return jsonify(result), 200
+
+
+@bp.route('/admin/<uuid:order_id>/status', methods=['PUT'])
+@require_admin()
+def update_order_status_admin(order_id):
+    """Update order status (Admin only)."""
+    from flask_jwt_extended import get_jwt_identity
+    
+    # No user_id filter - admins can update any order
+    order = Order.query.get(order_id)
+
+    if not order:
+        return jsonify(error_response(ErrorCode.ORDER_NOT_FOUND)), 404
+
+    schema = OrderStatusUpdateSchema()
+
+    try:
+        data = schema.load(request.json)
+    except ValidationError as err:
+        return jsonify(validation_error_response(err.messages)), 400
+
+    new_status = data['status']
+
+    # Validate status transitions
+    valid_transitions = {
+        Order.STATUS_PENDING: [Order.STATUS_PROCESSING, Order.STATUS_CANCELLED],
+        Order.STATUS_PROCESSING: [Order.STATUS_SHIPPED, Order.STATUS_CANCELLED],
+        Order.STATUS_SHIPPED: [Order.STATUS_DELIVERED],
+        Order.STATUS_DELIVERED: [],
+        Order.STATUS_CANCELLED: []
+    }
+
+    if new_status not in valid_transitions.get(order.status, []):
+        return jsonify(error_response(
+            ErrorCode.INVALID_STATUS_TRANSITION,
+            message=f'Cannot transition from {order.status} to {new_status}'
+        )), 400
+
+    # Get admin user_id for history
+    admin_user_id = get_jwt_identity()
+    
+    order.update_status(new_status, changed_by=admin_user_id, notes=data.get('notes'))
+    db.session.commit()
+
+    order_schema = OrderSchema()
+    return jsonify(order_schema.dump(order)), 200
