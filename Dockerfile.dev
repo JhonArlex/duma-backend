@@ -29,9 +29,9 @@ COPY . .
 RUN chmod +x scripts/docker-entrypoint.sh
 
 # Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# RUN adduser --disabled-password --gecos '' appuser && \
+#     chown -R appuser:appuser /app
+# USER appuser
 
 # Expose port
 EXPOSE 5000
