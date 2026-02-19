@@ -18,3 +18,8 @@ instance/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Database data directories
+redis_data/
+redis_data_develop/
+postgres_data/
