@@ -52,7 +52,7 @@ services:
       dockerfile: Dockerfile.prod
     container_name: duma-celery-worker-produccion
     restart: unless-stopped
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A app.celery worker --loglevel=info --concurrency=2
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - DATABASE_URL=${DATABASE_URL}

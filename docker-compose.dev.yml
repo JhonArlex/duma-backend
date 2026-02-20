@@ -55,7 +55,7 @@ services:
       - .:/app
     container_name: duma-celery-worker-develop
     restart: unless-stopped
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A app.celery worker --loglevel=info --concurrency=2
     environment:
       - FLASK_ENV=${FLASK_ENV}
       - DATABASE_URL=${DATABASE_URL}
