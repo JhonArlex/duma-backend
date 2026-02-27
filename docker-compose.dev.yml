@@ -29,7 +29,6 @@ services:
       - .:/app
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
 
 
@@ -71,7 +70,6 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
   # Celery Beat (Scheduler)
   celery-beat:
@@ -97,7 +95,6 @@ services:
         condition: service_started
     networks:
       - duma-network-develop
-      - db_duma-dbpostgress-develop
 
   # Nginx Reverse Proxy (optional, for production)
   nginx:
@@ -123,8 +120,6 @@ networks:
     driver: bridge
   duma-network-produccion:
     driver: bridge
-  db_duma-dbpostgress-develop:
-    external: true
 
 volumes:
   redis_data_develop:

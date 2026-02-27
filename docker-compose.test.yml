@@ -27,7 +27,6 @@ services:
       - ./logs:/app/logs
     networks:
       - duma-network-testing
-      - db_duma-dbpostgress-testing
 
 
 
@@ -113,8 +112,6 @@ networks:
   duma-network-testing:
     driver: bridge
   duma-network-produccion:
-    driver: bridge
-  db_duma-dbpostgress-testing:
-    external: true    
+    driver: bridge    
 volumes:
   redis_data_testing:
