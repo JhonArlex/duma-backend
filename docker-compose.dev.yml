@@ -20,6 +20,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SECRET_KEY=docker-secret-key-change-in-production
       - JWT_SECRET_KEY=docker-jwt-secret-key-change-in-production
+      - RATELIMIT_STORAGE_URI=${REDIS_URL}
     depends_on:
       redis:
         condition: service_started
@@ -64,6 +65,7 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SECRET_KEY=docker-secret-key-change-in-production
+      - RATELIMIT_STORAGE_URI=${REDIS_URL}
     depends_on:
       redis:
         condition: service_started
@@ -89,6 +91,7 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SECRET_KEY=docker-secret-key-change-in-production
+      - RATELIMIT_STORAGE_URI=${REDIS_URL}
     depends_on:
       redis:
         condition: service_started

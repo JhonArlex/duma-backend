@@ -39,6 +39,8 @@ class CartItemUpdateSchema(Schema):
     """Schema for updating cart item."""
 
     quantity = fields.Int(validate=validate.Range(min=1))
+    variant_size = fields.Str(validate=validate.Length(max=100))
+    variant_color = fields.Str(validate=validate.Length(max=100))
     notes = fields.Str()
 
 

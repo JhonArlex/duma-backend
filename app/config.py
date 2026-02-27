@@ -38,7 +38,7 @@ class Config:
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
     # Rate Limiting
-    RATELIMIT_STORAGE_URL = os.getenv('RATELIMIT_STORAGE_URL', 'redis://localhost:6379/1')
+    RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'redis://localhost:6379/1')
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '100/hour')
 
     # Celery

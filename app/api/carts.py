@@ -121,6 +121,10 @@ def update_item(item_id):
         item.quantity = data['quantity']
     if 'notes' in data:
         item.notes = data['notes']
+    if 'variant_size' in data:
+        item.variant_size = data['variant_size']
+    if 'variant_color' in data:
+        item.variant_color = data['variant_color']
 
     db.session.commit()
 
